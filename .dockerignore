@@ -1,0 +1,17 @@
+# .dockerignore
+# 忽略 Python 環境檔案
+venv/
+__pycache__/
+.pytest_cache/
+
+# 忽略本地開發快取/設定檔
+.git/
+.gitignore
+.env
+
+# 忽略 Streamlit 執行的暫存檔 (如果存在)
+.streamlit/
+
+# 忽略 Vector Store 資料庫 (這些應該是透過 Volume 掛載或重建)
+vectorstores/
+*.pem  # 憑證檔案（不應該打包進映像檔，而是透過 Secret 或 Volume 傳入）

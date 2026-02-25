@@ -1,7 +1,7 @@
 
 # Upload_file.py
 from utils import io, pytesseract, base64, requests, re, json, ffmpeg, tempfile, os, whisper
-from langchain.schema import Document
+from langchain_core.documents import Document
 from pptx import Presentation
 from docx import Document as DocxDocument
 from PyPDF2 import PdfReader
@@ -153,14 +153,27 @@ def load_documents_from_upload(uploaded_file, img_model):
 
     # 處理 mp4 (先只抽音訊, 把他轉成mp3後採用跟mp3一樣的處理方式) 要下載ffmpeg才能轉檔, 目前公司會擋所以暫時無法用mp4
     elif filename.endswith(".mp4"):
-        mp3_bytes, _ = (ffmpeg.input("pipe:0").output("pipe:1", format="mp3", acodec="libmp3lame").run(input=content, capture_stdout=True, capture_stderr=True))
-        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
-            tmp.write(mp3_bytes)
+        # 1. 創建一個暫存的 MP4 檔案
+        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp:
+            tmp.write(content) # 將上傳的 mp4 bytes 寫入檔案
             tmp_path = tmp.name
-        whisper_model = whisper.load_model("base")
-        result = whisper_model.transcribe(tmp_path)    # 用 Whisper 做轉錄
-        transcript = result["text"].strip()
-        return [Document(page_content=transcript, metadata={"source": uploaded_file.name, "type": "audio"})]
+        
+        try:
+            # 2. 直接讓 Whisper 讀取該 MP4 路徑 (Whisper 會自己處理音訊抽取)
+            whisper_model = whisper.load_model("base")
+            result = whisper_model.transcribe(tmp_path)
+            transcript = result["text"].strip()
+            
+            return [Document(page_content=transcript, metadata={"source": uploaded_file.name, "type": "audio"})]
+        
+        except Exception as e:
+            print(f"Transcribe error: {e}")
+            raise e
+        
+        finally:
+            # 3. 記得刪除暫存檔
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
 
     # === 處理純文字檔 .txt===
     else:

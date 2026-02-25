@@ -2,7 +2,7 @@
 # RAG_LLM_Generator.py
 from utils import List, re
 from langchain_ollama import OllamaLLM
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
 
 # 呼叫 LLM 根據 prompt 生成回應 
 def llm_generator(
@@ -13,20 +13,6 @@ def llm_generator(
     temperature: float = 0.7,
     top_p: float = 0.9,
 ) -> str:
-    """
-    使用 LLM (預設為deepseek-r1) 根據檢索到的內容與問題, 生成繁體中文的回應。
-
-    參數:
-    - query: 使用者的問題
-    - chunks_with_scores: 相似度搜尋得到的 [(文件區塊, 分數)] 清單
-    - ollama_url: 本地或遠端 Ollama API 端點
-    - llm_model: 使用的 LLM 模型名稱 (預設 deepseek-r1:8b)
-    - temperature: 控制輸出多樣性（愈高愈隨機）
-    - top_p: nucleus sampling 的參數（通常搭配 temperature 使用）
-
-    回傳:
-    - 回答文字 (str)
-    """
 
     # 建立 prompt 模板，支援 context 與 question 的格式化插入
     prompt_template = PromptTemplate.from_template(

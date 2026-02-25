@@ -6,6 +6,7 @@ Pillow
 langchain
 langchain_community
 langchain_ollama
+langchain-text-splitters
 faiss-cpu
 scipy
 FlagEmbedding
@@ -13,6 +14,6 @@ openai
 ffmpeg-python
 mammoth
 python-pptx
-textract
 python-docx
 openai-whisper
+transformers

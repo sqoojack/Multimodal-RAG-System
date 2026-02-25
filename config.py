@@ -10,11 +10,12 @@ available_llm_models = [
     "llava:7b",
     "llava-llama3:8b",
     "llama4:16x17b",
-    "gpt-oss:20b"
+    "gpt-oss:20b",
 ]
 
 # 可用的圖像描述模型選項
 available_img_models = [
+    "qwen3-vl:8b",
     "gemma3:27b",
     "llava:7b",
     "llava-llama3:8b",
@@ -35,7 +36,8 @@ default_model_settings = {
 
 # 預設 Ollama API URL
 # ollama_url = "http://172.20.5.116:11434"
-ollama_url = "http://127.0.0.1:11434"   # After ssh server connect
+# ollama_url = "http://127.0.0.1:11434"   # After ssh server connect
+ollama_url = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434")
 
 embedding_model = "bge-m3"
 reranking_url = "https://api.siliconflow.cn/v1/rerank"

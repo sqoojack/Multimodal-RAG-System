@@ -1,4 +1,5 @@
 # Command line: streamlit run app.py
+# python -m streamlit run app.py
 from utils import st
 from config import available_img_models, available_llm_models  # 匯入模型選項
 # Question: PROD備份到CLONE5之後要做哪些工作項目？

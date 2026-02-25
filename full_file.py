@@ -1,5 +1,5 @@
 # full_file.py
-from langchain.schema import Document
+from langchain_core.documents import Document 
 from RAG_LLM_Generator import llm_generator
 
 """ 支援不只取得第一高chunk的源頭檔(k個) """

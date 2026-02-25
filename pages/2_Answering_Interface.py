@@ -1,6 +1,6 @@
 # Answering_Interface.py
 from utils import os, json, st 
-from langchain.schema import Document  
+from langchain_core.documents import Document 
 from UI_model_select import render_model_settings_ui  
 from RAG_Embedding import load_vectorstore
 from RAG_LLM_Generator import llm_generator, extract_answer_and_thought 
@@ -73,7 +73,7 @@ else:
 render_model_settings_ui()
 
 # 使用者輸入問題
-query = st.text_area("**請輸入你的問題**", value="PROD備份到CLONE5之後要做哪些工作項目?")
+query = st.text_area("**請輸入你的問題**", value="如果公司要資遣一名適用『勞退新制』的員工，依照規定，預告期間要幾天？資遣費又要如何計算？")
 
 # 啟動問答流程
 if st.button("回答問題"):

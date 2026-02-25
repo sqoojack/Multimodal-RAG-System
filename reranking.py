@@ -1,25 +1,25 @@
 #reranking.py
 from utils import requests, List, CrossEncoder
 
-def rerank_with_siliconflow(query, passages: List[str], top_k, reranking_url, API_key, cert_datapath) -> List[tuple]:
+# def rerank_with_siliconflow(query, passages: List[str], top_k, reranking_url, API_key, cert_datapath) -> List[tuple]:
 
-    # reranking_url = reranking_url    # api_url在cherry studio的siliconflow中可找到, 因為ollama目前沒辦法使用reranking model
-    headers = {
-        "Content-Type": "application/json",     # 用來告訴伺服器傳的data是json類別
-        "Authorization": f"Bearer {API_key}"   # <---- 記得換成自己的API
-    }
-    data = {
-        "model": "BAAI/bge-reranker-v2-m3",  # reranking model name
-        "query": query,
-        "documents": passages                    # 欄位改為 documents
-    }
-    response = requests.post(reranking_url, headers=headers, json=data, verify=cert_datapath)     # 這邊要建立公司的憑證, 不然會SLL Error
-    result = response.json()
-    # 根據 API 實際回傳格式解析
-    scores = [r['relevance_score'] for r in result["results"]]  
-    #print(scores)
-    reranked = sorted(zip(passages, scores), key=lambda x: x[1], reverse=True)  # 回傳 chunk內容 以及reranking幫他評估的分數
-    return reranked[:top_k]     # 只回傳top_k筆
+#     # reranking_url = reranking_url    # api_url在cherry studio的siliconflow中可找到, 因為ollama目前沒辦法使用reranking model
+#     headers = {
+#         "Content-Type": "application/json",     # 用來告訴伺服器傳的data是json類別
+#         "Authorization": f"Bearer {API_key}"   # <---- 記得換成自己的API
+#     }
+#     data = {
+#         "model": "BAAI/bge-reranker-v2-m3",  # reranking model name
+#         "query": query,
+#         "documents": passages                    # 欄位改為 documents
+#     }
+#     response = requests.post(reranking_url, headers=headers, json=data, verify=cert_datapath)     # 這邊要建立公司的憑證, 不然會SLL Error
+#     result = response.json()
+#     # 根據 API 實際回傳格式解析
+#     scores = [r['relevance_score'] for r in result["results"]]  
+#     #print(scores)
+#     reranked = sorted(zip(passages, scores), key=lambda x: x[1], reverse=True)  # 回傳 chunk內容 以及reranking幫他評估的分數
+#     return reranked[:top_k]     # 只回傳top_k筆
 
 def rerank_with_HuggingFace(query, passages: List[str], top_k: int):
     model_name = "BAAI/bge-reranker-v2-m3" 
