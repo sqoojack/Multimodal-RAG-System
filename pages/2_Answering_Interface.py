@@ -4,6 +4,7 @@ from langchain_core.documents import Document
 from UI_model_select import render_model_settings_ui  
 from RAG_Embedding import load_vectorstore
 from RAG_LLM_Generator import llm_generator, extract_answer_and_thought 
+from RAG_Evaluation import evaluate_rag_result
 from reranking import search_top_k, rerank_chunks_top_k  
 from full_file import generate_full_files_answer  # Custom RAG 處理邏輯
 from config import default_model_settings, ollama_url, VECTOR_DB_DIR, reranking_url, reranking_api, cert_datapath  
@@ -21,6 +22,8 @@ if "vectorstore" not in st.session_state:
     st.session_state.vectorstore = None
 if "docs" not in st.session_state:
     st.session_state.docs = []
+if "qa_result" not in st.session_state:
+    st.session_state.qa_result = None
 
 # 搜尋本地資料夾中所有向量資料庫（資料夾名稱 = DB 名稱）
 vector_db_names = [f for f in os.listdir(VECTOR_DB_DIR) if os.path.isdir(os.path.join(VECTOR_DB_DIR, f))]
@@ -142,53 +145,62 @@ if st.button("回答問題"):
 
                 # 分離 LLM 輸出：最終答案 vs 思考過程
                 ans, thought = extract_answer_and_thought(answer)
-
-                # 分為左右區塊顯示回答與來源片段
-                left, right = st.columns([2, 1])
-                with left:
-                    st.markdown("### 📘 回答：")
-                    st.markdown(ans)
-                    if thought:
-                        with st.expander("💭 思考過程"):
-                            st.markdown(thought)
-                with right:
-                    st.markdown("### 🔍 匹配段落：")
-                    if search_method == "Custom RAG":
-                        for i, doc in enumerate(file_chunks):
-                            with st.expander(f"段落 {i+1} | 來源: {doc.metadata.get('source')}"):
-                                st.write(doc.page_content)
-                    else:
-                        for i, (doc, score) in enumerate(top_chunks):
-                            with st.expander(f"Rank {i+1} | 來源: {doc.metadata.get('source')} | 分數: {score:.2f}"):
-                                st.write(doc.page_content)
-                
-                # 新增RAG系統評估
-                st.divider()
-                st.markdown("### 📊 RAG 系統效能量化評估")
-                
-                # 判斷傳入評估的 chunks 變數
                 eval_chunks = file_chunks if search_method == "Custom RAG" else top_chunks
                 
-                if st.button("執行 Ragas 指標評估 (需消耗運算資源)"):
-                    with st.spinner("LLM 正在進行交叉驗證 (Faithfulness, Answer Relevance)..."):
-                        try:
-                            from RAG_Evaluation import evaluate_rag_result
-                            
-                            # vectorstore.embeddings 通常為你在 RAG_Embedding.py 中初始化的模型
-                            eval_df = evaluate_rag_result(
-                                query=query,
-                                answer=ans,  # 僅評估最終答案，排除 <think> 過程
-                                top_chunks=eval_chunks,
-                                ollama_url=ollama_url,
-                                llm_model=st.session_state.model_settings.get("llm_model"),
-                                embeddings=vectorstore.embeddings 
-                            )
-                            
-                            st.success("評估完成")
-                            st.dataframe(eval_df[["faithfulness", "answer_relevance"]], use_container_width=True)
-                            
-                        except Exception as eval_e:
-                            st.error(f"評估過程發生錯誤：{eval_e}")
+                st.session_state.qa_result = {
+                    "query": query,
+                    "ans": ans,
+                    "thought": thought,
+                    "eval_chunks": eval_chunks,
+                    "search_method": search_method
+                }
 
+                
         except Exception as e:
             st.error(f"❌ 發生錯誤：{e}")
+            
+if st.session_state.qa_result is not None:
+    res = st.session_state.qa_result
+    
+    # 分為左右區塊顯示回答與來源片段
+    left, right = st.columns([2, 1])
+    with left:
+        st.markdown("### 📘 回答：")
+        st.markdown(res["ans"])  # 改從 res 取出 ans
+        if res["thought"]:       # 改從 res 取出 thought
+            with st.expander("💭 思考過程"):
+                st.markdown(res["thought"])
+                
+    with right:
+        st.markdown("### 🔍 匹配段落：")
+        # 改從 res 取出 search_method 與 eval_chunks
+        if res["search_method"] == "Custom RAG":
+            for i, doc in enumerate(res["eval_chunks"]):
+                with st.expander(f"段落 {i+1} | 來源: {doc.metadata.get('source')}"):
+                    st.write(doc.page_content)
+        else:
+            for i, item in enumerate(res["eval_chunks"]):
+                # 一般檢索的資料格式是 tuple: (doc, score)
+                doc, score = item
+                with st.expander(f"Rank {i+1} | 來源: {doc.metadata.get('source')} | 分數: {score:.2f}"):
+                    st.write(doc.page_content)
+
+    # 新增 RAG 系統評估區塊 (現在位於外層)
+    st.divider()
+    st.markdown("### 📊 RAG 系統效能量化評估")
+    
+    if st.button("執行 Ragas 指標評估 (需消耗運算資源)"):
+        with st.spinner("LLM 正在進行交叉驗證 (Faithfulness, Answer Relevance)..."):
+            try:
+                eval_df = evaluate_rag_result(
+                    query=res["query"],
+                    answer=res["ans"],
+                    top_chunks=res["eval_chunks"],
+                    ollama_url=ollama_url,
+                    llm_model=st.session_state.model_settings.get("llm_model"),
+                    embeddings=st.session_state.vectorstore.embeddings 
+                )
+                st.success("評估完成")
+                st.dataframe(eval_df[["faithfulness", "answer_relevancy"]], use_container_width=True)
+            except Exception as eval_e:
+                st.error(f"評估過程發生錯誤：{eval_e}")

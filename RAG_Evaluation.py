@@ -2,17 +2,10 @@
 import pandas as pd
 from datasets import Dataset
 from ragas import evaluate
-from ragas.metrics import faithfulness, answer_relevance
+from ragas.metrics import faithfulness, answer_relevancy
 from langchain_ollama import ChatOllama
 
 def evaluate_rag_result(query: str, answer: str, top_chunks: list, ollama_url: str, llm_model: str, embeddings) -> pd.DataFrame:
-    """
-    執行 RAG 自動化評估
-    使用指標：
-    - faithfulness: 評估生成的答案是否都來自檢索出的上下文 (防幻覺)。
-    - answer_relevance: 評估生成的答案是否有效回答了使用者的問題。
-    """
-    # 提取檢索到的文本，若為 Custom RAG 則傳入對應的 file_chunks
     contexts = [doc.page_content for doc, _ in top_chunks] if isinstance(top_chunks[0], tuple) else [doc.page_content for doc in top_chunks]
     
     data = {
@@ -29,7 +22,7 @@ def evaluate_rag_result(query: str, answer: str, top_chunks: list, ollama_url: s
     # 執行評估，覆寫 LLM 與 Embeddings
     result = evaluate(
         dataset=dataset,
-        metrics=[faithfulness, answer_relevance],
+        metrics=[faithfulness, answer_relevancy],
         llm=eval_llm,
         embeddings=embeddings,
         raise_exceptions=False
