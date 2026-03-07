@@ -161,6 +161,34 @@ if st.button("回答問題"):
                         for i, (doc, score) in enumerate(top_chunks):
                             with st.expander(f"Rank {i+1} | 來源: {doc.metadata.get('source')} | 分數: {score:.2f}"):
                                 st.write(doc.page_content)
+                
+                # 新增RAG系統評估
+                st.divider()
+                st.markdown("### 📊 RAG 系統效能量化評估")
+                
+                # 判斷傳入評估的 chunks 變數
+                eval_chunks = file_chunks if search_method == "Custom RAG" else top_chunks
+                
+                if st.button("執行 Ragas 指標評估 (需消耗運算資源)"):
+                    with st.spinner("LLM 正在進行交叉驗證 (Faithfulness, Answer Relevance)..."):
+                        try:
+                            from RAG_Evaluation import evaluate_rag_result
+                            
+                            # vectorstore.embeddings 通常為你在 RAG_Embedding.py 中初始化的模型
+                            eval_df = evaluate_rag_result(
+                                query=query,
+                                answer=ans,  # 僅評估最終答案，排除 <think> 過程
+                                top_chunks=eval_chunks,
+                                ollama_url=ollama_url,
+                                llm_model=st.session_state.model_settings.get("llm_model"),
+                                embeddings=vectorstore.embeddings 
+                            )
+                            
+                            st.success("評估完成")
+                            st.dataframe(eval_df[["faithfulness", "answer_relevance"]], use_container_width=True)
+                            
+                        except Exception as eval_e:
+                            st.error(f"評估過程發生錯誤：{eval_e}")
 
         except Exception as e:
             st.error(f"❌ 發生錯誤：{e}")

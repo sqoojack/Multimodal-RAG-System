@@ -15,12 +15,6 @@ WORKDIR /app
 # 由於您的 requirements.txt 包含 PyPDF2, Pillow, langchain 等
 COPY requirements.txt .
 
-# ⚠️ 注意：您的專案依賴 Tesseract, ffmpeg, PyPDF2 等函式庫
-# 需要額外安裝系統依賴。
-# Tesseract (用於 OCR)
-# ffmpeg (用於音訊/影片處理)
-
-# 安裝系統依賴 (Streamlit App)
 RUN apt-get update \
     && apt-get install -y \
         tesseract-ocr \
@@ -39,8 +33,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # 由於 Streamlit 預設運行在 8501 端口
-EXPOSE 8501
+EXPOSE 8502
 
 # 定義容器啟動時執行的指令
-# [cite_start]根據 README.md 的執行指令 [cite: 1]
-CMD ["streamlit", "run", "app.py"]
+# CMD ["streamlit", "run", "app.py"]
+
+CMD ["python", "-m", "streamlit", "run", "app.py"]

@@ -16,4 +16,7 @@ mammoth
 python-pptx
 python-docx
 openai-whisper
-transformers
+transformers==4.44.2
+ragas
+datasets
+pandas

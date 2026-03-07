@@ -1,42 +1,16 @@
-version: '3.8'
-
 services:
-  # 1. RAG Streamlit 應用程式服務
+  # RAG Streamlit 應用程式服務
   rag_app:
     build:
-      context: .  # 使用當前目錄下的 Dockerfile
+      context: .
     container_name: streamlit_rag_app
-    ports:
-      - "8501:8501"  # 將本機的 8501 端口映射到容器的 8501
+    # 在 Linux 上使用 host 網路模式，效能最好且連線最簡單
+    network_mode: "host" 
     volumes:
-      # 掛載程式碼目錄，方便開發時修改程式碼不需重建映像檔 (Live Reload)
       - .:/app
-      # 掛載 Vector Store 資料庫路徑
-      - ./vectorstores:/app/vectorstores 
-      # 掛載證書路徑 (根據 config.py)
+      - ./vectorstores:/app/vectorstores
       - ./PHCheng.pem:/app/PHCheng.pem
-    
-    # 環境變數：覆寫 config.py 內的本地 Ollama URL
-    # 讓 app 服務知道 ollama 服務的位址 (Docker 網路會使用服務名稱作為 DNS)
     environment:
-      - OLLAMA_URL=http://ollama:11434  # 使用服務名稱 `ollama`
-      # ⚠️ 建議將敏感 API Key (如 reranking_api) 設為環境變數
-
-    # 確保 Ollama 服務先啟動
-    depends_on:
-      - ollama
-      
-  # 2. Ollama 服務 (提供 LLM 和 Image Model)
-  ollama:
-    image: ollama/ollama:latest # 使用最新的 Ollama 映像檔
-    container_name: ollama_service
-    # 由於 LLM 模型檔案很大，建議掛載一個 Volume 來保存模型
-    volumes:
-      - ollama_models:/root/.ollama
-    # 確保它能被 rag_app 服務存取
-    ports:
-      - "11435:11434"
-
-volumes:
-  ollama_models:
-    # 專門用於持久化 Ollama 模型資料
+      # 因為使用 host 模式，直接連本機的 11434 端口
+      - OLLAMA_URL=http://127.0.0.1:11434 
+    # 移除 depends_on: ollama，因為我們不用 Docker 跑 ollama 了
