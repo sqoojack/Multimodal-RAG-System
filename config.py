@@ -3,14 +3,14 @@ import os
 # 可用的語言模型選項
 available_llm_models = [
     "deepseek-r1:8b",
-    "qwen3:14b",
-    "qwen2.5:7b",
     "gemma3:27b",
     "deepseek-r1:32b",
     "llava:7b",
     "llava-llama3:8b",
     "llama4:16x17b",
     "gpt-oss:20b",
+    "qwen3.5:9b",
+    "qwen3.5:27b",
 ]
 
 # 可用的圖像描述模型選項

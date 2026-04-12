@@ -197,7 +197,8 @@ if st.session_state.qa_result is not None:
                     answer=res["ans"],
                     top_chunks=res["eval_chunks"],
                     ollama_url=ollama_url,
-                    llm_model=st.session_state.model_settings.get("llm_model"),
+                    # llm_model=st.session_state.model_settings.get("llm_model"),
+                    llm_model="deepseek-r1:8b",
                     embeddings=st.session_state.vectorstore.embeddings 
                 )
                 st.success("評估完成")
