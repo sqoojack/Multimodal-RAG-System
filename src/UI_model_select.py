@@ -5,28 +5,28 @@ from config import available_llm_models, available_img_models
 # 知識庫建立的設定介面
 def render_create_DB_select():
     
-    with st.expander("⚙️ **建立知識庫參數設定**", expanded=True):
+    with st.expander("⚙️ **Knowledge Base Parameter Setting**", expanded=True):
         # 選擇圖片 Embedding 模型，預設是 session_state 中的 img_model
         img_model = st.selectbox(
-            "**選擇處理圖片的模型**",
+            "**Select Vision Language Model**",
             options=available_img_models,
             index=available_img_models.index(st.session_state.model_settings.get("img_model", available_img_models[0]))
         )
         chunk_size = st.slider("chunk_size", 200, 2000, st.session_state.model_settings["chunk_size"])
         chunk_overlap =  st.slider("chunk_overlap", 50, 600, st.session_state.model_settings["chunk_overlap"])
         
-        if st.button("✅ 儲存參數", key="save_img_model_settings"):
+        if st.button("✅ Save Parameter", key="save_img_model_settings"):
             st.session_state.model_settings.update({
                 "img_model": img_model,
                 "chunk_size": chunk_size,
                 "chunk_overlap": chunk_overlap
             })
-            st.success("參數已儲存！")
+            st.success("Parameter save success！")
 
 # 渲染問答模型相關參數設定的 UI，讓使用者能在介面上調整參數
 def render_model_settings_ui():
     
-    with st.expander("⚙️ **問答模型參數設定**", expanded=True):
+    with st.expander("⚙️ **Q&A Model Parameter Settings**", expanded=True):
 
         if "model_settings" not in st.session_state:
             st.session_state.model_settings = {
@@ -42,19 +42,19 @@ def render_model_settings_ui():
         
         # 選擇使用的語言模型，預設值從 session_state 讀取
         llm_model = st.selectbox(
-            "**選擇語言模型**",
+            "**choose Large Language Model**",
             options=available_llm_models,
             index=available_llm_models.index(st.session_state.model_settings["llm_model"])
         )
         
         search_method = st.radio(
-            "🔍 **選擇檢索模式**",
+            "🔍 **choose advanced RAG mode**",
             options=["MMR", "Reranking", "Custom RAG", "Basic"],
             index=0,
             horizontal=True
         )
         # 使用滑桿設定
-        temperature = st.slider("溫度 (temperature)", 0.0, 1.0, st.session_state.model_settings["temperature"])
+        temperature = st.slider("temperature", 0.0, 1.0, st.session_state.model_settings["temperature"])
         top_p = st.slider("Top-p", 0.0, 1.0, st.session_state.model_settings["top_p"])
         if search_method != "Basic":
             top_n = st.slider("Top-n", 2, 30, st.session_state.model_settings["top_n"])
@@ -66,7 +66,7 @@ def render_model_settings_ui():
 
         if search_method == "Basic":
             # 按鈕用於儲存目前 UI 上調整的參數，按下後會更新 session_state
-            if st.button("✅ 儲存參數", key="save_qa_model_settings"):
+            if st.button("✅ Save parameter", key="save_qa_model_settings"):
                 st.session_state.model_settings.update({
                     "llm_model": llm_model,
                     "temperature": temperature,
@@ -74,9 +74,9 @@ def render_model_settings_ui():
                     "top_k": top_k,
                     "search_method": search_method
                 })
-                st.success("參數已儲存！")
+                st.success("parameter save success！")
         else:
-            if st.button("✅ 儲存參數", key="save_qa_model_settings"):
+            if st.button("✅ Save parameter", key="save_qa_model_settings"):
                 st.session_state.model_settings.update({
                     "llm_model": llm_model,
                     "temperature": temperature,
@@ -85,7 +85,7 @@ def render_model_settings_ui():
                     "top_k": top_k,
                     "search_method": search_method
                 })
-                st.success("參數已儲存！")
+                st.success("parameter save success！")
 
 # 將向量資料庫、文件列表與檔案資訊存入 session_state，方便跨頁面或重新整理後持續使用
 def save_vectorstore_to_session(vectorstore, docs, uploaded_files):
