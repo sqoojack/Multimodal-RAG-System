@@ -6,18 +6,18 @@ from RAG_Embedding import load_vectorstore
 from RAG_LLM_Generator import llm_generator, extract_answer_and_thought 
 from RAG_Evaluation import evaluate_rag_result
 from reranking import search_top_k, rerank_chunks_top_k  
-from full_file import generate_full_files_answer  # Custom RAG 處理邏輯
+from full_file import generate_full_files_answer  # Custom RAG logic
 from config import default_model_settings, ollama_url, VECTOR_DB_DIR, reranking_url, reranking_api, cert_datapath  
 
-# 設定 Streamlit 頁面資訊
-st.set_page_config(page_title="問答介面", page_icon="💬")
-st.title("💬 問答介面")
+# Set Streamlit page info
+st.set_page_config(page_title="Q&A Interface", page_icon="💬")
+st.title("💬 Q&A Interface")
 
-# 初始化 model_settings（從 Session State 取得或套用預設值）
+# Initialize model_settings (from Session State or apply defaults)
 if "model_settings" not in st.session_state:
     st.session_state.model_settings = default_model_settings.copy()
 
-# 初始化向量資料庫與文件列表
+# Initialize vector database and document list
 if "vectorstore" not in st.session_state:
     st.session_state.vectorstore = None
 if "docs" not in st.session_state:
@@ -25,25 +25,25 @@ if "docs" not in st.session_state:
 if "qa_result" not in st.session_state:
     st.session_state.qa_result = None
 
-# 搜尋本地資料夾中所有向量資料庫（資料夾名稱 = DB 名稱）
+# Search local directory for all vector databases (folder name = DB name)
 vector_db_names = [f for f in os.listdir(VECTOR_DB_DIR) if os.path.isdir(os.path.join(VECTOR_DB_DIR, f))]
 
-# 使用 selectbox 讓使用者選擇一個資料庫
-selected_db = st.selectbox("📂 **選擇已建立的向量資料庫**", options=vector_db_names)
+# Use selectbox to let user choose a database
+selected_db = st.selectbox("📂 **Select an existing vector database**", options=vector_db_names)
 
-# 如果使用者有選擇資料庫，則嘗試讀取向量資料與原始文件
+# Attempt to load vector data and raw documents if user selected a database
 if selected_db:
     try:
         db_path = os.path.join(VECTOR_DB_DIR, selected_db)
 
-        # 載入向量資料庫（透過 Ollama 的 Embedding Model）
+        # Load vector database (via Ollama's Embedding Model)
         vectorstore = load_vectorstore(
             db_path,
             embedding_model=st.session_state.model_settings.get("embedding_model", "bge-m3"),
         )
         st.session_state.vectorstore = vectorstore
 
-        # 讀取原始文字內容（例如頁面內容與來源資訊）放入 docs
+        # Read raw text content (e.g., page content and source info) into docs
         metadata_path = os.path.join(db_path, "metadata.json")
         if os.path.exists(metadata_path):
             with open(metadata_path, "r", encoding="utf-8") as f:
@@ -51,13 +51,13 @@ if selected_db:
 
             docs_list = []
             if isinstance(metadata_list, list):
-                # metadata.json 是 List 格式
+                # metadata.json is in List format
                 for meta in metadata_list:
                     page_content = meta.get("page_content", "")
                     meta_data = meta.get("metadata", {})
                     docs_list.append(Document(page_content=page_content, metadata=meta_data))
             elif isinstance(metadata_list, dict):
-                # metadata.json 是單一 Document 格式
+                # metadata.json is in a single Document format
                 page_content = metadata_list.get("page_content", "")
                 meta_data = metadata_list.get("metadata", {})
                 docs_list.append(Document(page_content=page_content, metadata=meta_data))
@@ -66,43 +66,43 @@ if selected_db:
             st.session_state.docs = []
 
     except Exception as e:
-        st.error(f"❌ 向量資料庫載入失敗：{e}")
+        st.error(f"❌ Failed to load vector database: {e}")
         st.stop()
 else:
-    st.warning("⚠️ 尚未建立向量資料庫，請先至【建立知識庫】頁上傳檔案。")
+    st.warning("⚠️ No vector database created yet. Please go to the 'Create Knowledge Base' page to upload files.")
     st.stop()
 
-# 顯示 LLM 模型與參數設定選單（top_p、temperature 等）
+# Display LLM model and parameter settings menu (top_p, temperature, etc.)
 render_model_settings_ui()
 
-# 使用者輸入問題
-query = st.text_area("**請輸入你的問題**", value="如果公司要資遣一名適用『勞退新制』的員工，依照規定，預告期間要幾天？資遣費又要如何計算？")
+# User inputs question
+query = st.text_area("**Please enter your question**", value="What are the regulations regarding notice periods and severance pay calculations?")
 
-# 啟動問答流程
-if st.button("回答問題"):
+# Start Q&A process
+if st.button("Get Answer"):
     if not query.strip():
-        st.warning("請輸入問題")
+        st.warning("Please enter a question.")
     else:
         try:
-            with st.spinner("檢索中..."):
-                # 根據設定選擇搜尋方法：Basic / Reranking / MMR / Custom RAG
+            with st.spinner("Retrieving..."):
+                # Choose search method based on settings: Basic / Reranking / MMR / Custom RAG
                 search_method = st.session_state.model_settings.get("search_method", "Basic")
                 vectorstore = st.session_state.vectorstore
 
                 if search_method == "MMR":
-                    # 採用 Maximal Marginal Relevance 檢索
+                    # Use Maximal Marginal Relevance retrieval
                     retriever = vectorstore.as_retriever(
                         search_type="mmr",
                         search_kwargs={"k": st.session_state.model_settings.get("top_k", 5), "fetch_k": st.session_state.model_settings.get("top_n", 10), "lambda_mult": 0.5}
                     )
                     mmr_docs = retriever.invoke(query)
                     top_chunks = [(doc, 1.0) for doc in mmr_docs]
-                    st.success("✅ MMR檢索完成")
+                    st.success("✅ MMR retrieval complete.")
 
                 elif search_method in ["Reranking", "Custom RAG"]:
-                    # 使用向量搜尋初步取得 top_k 候選片段
+                    # Use vector search to obtain top_k candidate chunks initially
                     candidates = search_top_k(query, vectorstore, top_k=st.session_state.model_settings.get("top_n", 10))
-                    # 再透過 Reranker 精選 top_k 片段
+                    # Further refine top_k chunks using Reranker
                     top_chunks = rerank_chunks_top_k(
                         query,
                         candidates,
@@ -111,20 +111,20 @@ if st.button("回答問題"):
                         reranking_api=reranking_api,
                         cert_datapath=cert_datapath
                     )
-                    st.success("✅ Reranking完成")
+                    st.success("✅ Reranking complete.")
 
                 else:
-                    # 採用最基本的向量 Top-K 搜尋
+                    # Use basic vector Top-K search
                     top_chunks = search_top_k(
                         query,
                         vectorstore,
                         top_k=st.session_state.model_settings.get("top_k", 5)
                     )
-                    st.success("✅ Basic 檢索完成")
+                    st.success("✅ Basic retrieval complete.")
 
-            with st.spinner("生成回答中..."):
+            with st.spinner("Generating answer..."):
                 if search_method == "Custom RAG":
-                    # 使用完整檔案資訊結合片段做回答（適用長文件）
+                    # Use full file info combined with chunks for answer (suitable for long docs)
                     file_chunks, answer = generate_full_files_answer(
                         top_chunks,
                         st.session_state.docs,
@@ -133,7 +133,7 @@ if st.button("回答問題"):
                         st.session_state.model_settings
                     )
                 else:
-                    # 傳送 query + top_chunks 給 LLM 模型生成回答
+                    # Send query + top_chunks to LLM model to generate answer
                     answer = llm_generator(
                         query,
                         top_chunks,
@@ -143,7 +143,7 @@ if st.button("回答問題"):
                         top_p=st.session_state.model_settings.get("top_p", 1.0),
                     )
 
-                # 分離 LLM 輸出：最終答案 vs 思考過程
+                # Separate LLM output: final answer vs thought process
                 ans, thought = extract_answer_and_thought(answer)
                 eval_chunks = file_chunks if search_method == "Custom RAG" else top_chunks
                 
@@ -157,40 +157,40 @@ if st.button("回答問題"):
 
                 
         except Exception as e:
-            st.error(f"❌ 發生錯誤：{e}")
+            st.error(f"❌ Error occurred: {e}")
             
 if st.session_state.qa_result is not None:
     res = st.session_state.qa_result
     
-    # 分為左右區塊顯示回答與來源片段
+    # Split into left/right blocks to show answer and source chunks
     left, right = st.columns([2, 1])
     with left:
-        st.markdown("### 📘 回答：")
-        st.markdown(res["ans"])  # 改從 res 取出 ans
-        if res["thought"]:       # 改從 res 取出 thought
-            with st.expander("💭 思考過程"):
+        st.markdown("### 📘 Answer:")
+        st.markdown(res["ans"])  # Retrieve ans from res
+        if res["thought"]:       # Retrieve thought from res
+            with st.expander("💭 Thought Process"):
                 st.markdown(res["thought"])
                 
     with right:
-        st.markdown("### 🔍 匹配段落：")
-        # 改從 res 取出 search_method 與 eval_chunks
+        st.markdown("### 🔍 Matched Paragraphs:")
+        # Retrieve search_method and eval_chunks from res
         if res["search_method"] == "Custom RAG":
             for i, doc in enumerate(res["eval_chunks"]):
-                with st.expander(f"段落 {i+1} | 來源: {doc.metadata.get('source')}"):
+                with st.expander(f"Paragraph {i+1} | Source: {doc.metadata.get('source')}"):
                     st.write(doc.page_content)
         else:
             for i, item in enumerate(res["eval_chunks"]):
-                # 一般檢索的資料格式是 tuple: (doc, score)
+                # Format for general retrieval is tuple: (doc, score)
                 doc, score = item
-                with st.expander(f"Rank {i+1} | 來源: {doc.metadata.get('source')} | 分數: {score:.2f}"):
+                with st.expander(f"Rank {i+1} | Source: {doc.metadata.get('source')} | Score: {score:.2f}"):
                     st.write(doc.page_content)
 
-    # 新增 RAG 系統評估區塊 (現在位於外層)
+    # Add RAG system evaluation block (now placed outside)
     st.divider()
-    st.markdown("### 📊 RAG 系統效能量化評估")
+    st.markdown("### 📊 RAG System Performance Evaluation")
     
-    if st.button("執行 Ragas 指標評估 (需消耗運算資源)"):
-        with st.spinner("LLM 正在進行交叉驗證 (Faithfulness, Answer Relevance)..."):
+    if st.button("Run Ragas Metric Evaluation (Consumes compute resources)"):
+        with st.spinner("LLM is performing cross-validation (Faithfulness, Answer Relevance)..."):
             try:
                 eval_df = evaluate_rag_result(
                     query=res["query"],
@@ -201,7 +201,7 @@ if st.session_state.qa_result is not None:
                     llm_model="deepseek-r1:8b",
                     embeddings=st.session_state.vectorstore.embeddings 
                 )
-                st.success("評估完成")
+                st.success("Evaluation complete.")
                 st.dataframe(eval_df[["faithfulness", "answer_relevancy"]], use_container_width=True)
             except Exception as eval_e:
-                st.error(f"評估過程發生錯誤：{eval_e}")
+                st.error(f"Error occurred during evaluation: {eval_e}")

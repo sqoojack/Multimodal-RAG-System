@@ -1,16 +1,12 @@
 services:
-  # RAG Streamlit 應用程式服務
   rag_app:
     build:
       context: .
     container_name: streamlit_rag_app
-    # 在 Linux 上使用 host 網路模式，效能最好且連線最簡單
     network_mode: "host" 
     volumes:
-      - .:/app
+      - ./src:/app/src
       - ./vectorstores:/app/vectorstores
       - ./PHCheng.pem:/app/PHCheng.pem
     environment:
-      # 因為使用 host 模式，直接連本機的 11434 端口
-      - OLLAMA_URL=http://127.0.0.1:11434 
-    # 移除 depends_on: ollama，因為我們不用 Docker 跑 ollama 了
+      - OLLAMA_URL=http://127.0.0.1:11434

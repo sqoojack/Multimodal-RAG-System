@@ -6,82 +6,82 @@ from config import VECTOR_DB_DIR
 
 from RAG_Embedding import load_metadata, delete_files_from_db, create_new_vector_db, delete_vector_db, rebuild_vector_db
 
-# 初始化使用者的最後操作狀態（用於觸發 UI 更新）
+# Initialize user's last action state (used to trigger UI updates)
 if "last_action" not in st.session_state:
-    st.session_state.last_action = None  # 可為 add/delete/create/delete_db
+    st.session_state.last_action = None  # Can be add/delete/create/delete_db
 
-# 設定頁面為寬版，並建立左右兩欄
+# Set page to wide layout and create left/right columns
 st.set_page_config(layout="wide")
 col_left, col_right = st.columns([1, 1])
 
-# ===== 左邊：建立新的資料庫 =====
+# ===== Left: Create new database =====
 with col_left:
-    st.header("📂 新增知識庫")
+    st.header("📂 Create Knowledge Base")
 
-    # 模型選擇（例如選擇圖像處理模型 gemma3:27b 等）
+    # Model selection (e.g., select image processing model gemma3:27b, etc.)
     render_create_DB_select()
 
-    # 上傳用來建立新資料庫的檔案
+    # Upload files to create a new database
     uploaded_files = st.file_uploader(
-        "**上傳 PDF, Word, PPT, 影音, 純文字或圖片檔**",
+        "**Upload PDF, Word, PPT, Media, Text or Image files**",
         type=["pdf", "ppt", "pptx", "docx", "txt", "png", "jpg", "jpeg", "mp3", "mp4"],
         accept_multiple_files=True,
         key="new_db_files"
     )
 
-    # 資料庫命名輸入欄位
-    db_name = st.text_input("**請為這次建立的資料庫命名 (英文或數字)**", key="new_db_name")
-    build_btn = st.button("🚧 建立向量資料庫", key="build_new_db")
+    # Database naming input field
+    db_name = st.text_input("**Name the database (English or numbers)**", key="new_db_name")
+    build_btn = st.button("🚧 Build Vector Database", key="build_new_db")
 
-    # 建立新資料庫並進行向量化處理
+    # Create new database and process vectorization
     if build_btn:
         if not db_name:
-            st.warning("請輸入資料庫名稱")
+            st.warning("Please enter a database name.")
         elif not uploaded_files:
-            st.warning("請先上傳檔案")
+            st.warning("Please upload files first.")
         else:
             try:
-                with st.spinner("正在創建向量資料庫"):
+                with st.spinner("Creating vector database..."):
                     chunk_size = st.session_state.model_settings["chunk_size"]
                     chunk_overlap = st.session_state.model_settings["chunk_overlap"]
                     count = create_new_vector_db(db_name, uploaded_files, st.session_state.model_settings["img_model"], first_time=True, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
-                st.success(f"✅ 資料庫「{db_name}」建立完成，共 {count} 個chunk")
+                st.success(f"✅ Database '{db_name}' created successfully with {count} chunks.")
                 st.session_state.last_action = "create"
                 st.stop()
             except FileExistsError:
-                st.error(f"❗ 資料庫「{db_name}」已存在，請換名稱")
+                st.error(f"❗ Database '{db_name}' already exists, please choose a different name.")
 
 
-# ===== 右邊：知識庫管理 =====
+# ===== Right: Manage Knowledge Base =====
 with col_right:
-    st.header("📂 管理知識庫")
+    st.header("📂 Manage Knowledge Base")
     chunk_size = st.session_state.model_settings["chunk_size"]
     chunk_overlap = st.session_state.model_settings["chunk_overlap"]
     
-    # 取得已存在的資料庫資料夾列表
+    # Get list of existing database folders
     db_list = sorted([d for d in os.listdir(VECTOR_DB_DIR) if os.path.isdir(os.path.join(VECTOR_DB_DIR, d))])
     selected_db = None
 
-    # 資料庫選單區塊
-    with st.expander("📚 **已有資料庫列表**", expanded=True):
+    # Database selection section
+    with st.expander("📚 **Existing Database List**", expanded=True):
         if db_list:
-            selected_db = st.selectbox("**選擇資料庫查看細節與管理**", [""] + db_list)
+            selected_db = st.selectbox("**Select a database to view details and manage**", [""] + db_list)
         else:
-            st.write("尚無任何已建立的資料庫")
+            st.write("No databases have been created yet.")
     
-    # 如果使用者選取了某個資料庫，顯示其詳細資訊與操作功能
+    # If the user selected a database, show its details and management options
     if selected_db:
-        meta = load_metadata(selected_db)  # 讀取 metadata.json
-        st.markdown(f"### 資料庫：`{selected_db}`")
-        st.write("上次編輯時間:", meta.get("last_edit", "未知"))
-        st.write("chunk_size：", meta.get("chunk_size", 0))
+        meta = load_metadata(selected_db)  # Read metadata.json
+        st.markdown(f"### Database: `{selected_db}`")
+        st.write("Last edited:", meta.get("last_edit", "Unknown"))
+        st.write("Chunk size:", meta.get("chunk_size", 0))
 
         files = meta.get("files", [])
-        st.write("包含檔案：")
+        st.write("Included files:")
         
 
         if files:
-            # 建立一個 dict 用來儲存勾選狀態
+            # Create a dict to store checkbox status
             selected_to_delete = {}
             for idx, f_name in enumerate(files, start=1):
                 col1, col2 = st.columns([0.1, 0.9])
@@ -91,46 +91,45 @@ with col_right:
                     key=f"checkbox_{f_name}"
                 )
 
-            # 統一刪除按鈕
-            if st.button("❌ 刪除勾選檔案"):
+            # Batch delete button
+            if st.button("❌ Delete Selected Files"):
                 files_to_delete = [f for f, checked in selected_to_delete.items() if checked]
                 count = delete_files_from_db(selected_db, files_to_delete, chunk_overlap)
-                st.success(f"✅ 資料庫「{selected_db}」更新完成，共 {count} 個chunk")     
+                st.success(f"✅ Database '{selected_db}' updated successfully, {count} chunks remaining.")     
         else:
-            st.write("（目前無任何檔案）")
+            st.write("(No files currently)")
 
-    # ===== 整庫刪除功能 =====
-        with st.expander("🗑️ 刪除整個資料庫", expanded=False):
-            confirmed = st.checkbox("⚠️ 確認刪除此資料庫，操作不可恢復！", key="confirm_delete_db")
-            if st.button("刪除資料庫", key="delete_db_btn"):
+    # ===== Delete entire database function =====
+        with st.expander("🗑️ Delete Entire Database", expanded=False):
+            confirmed = st.checkbox("⚠️ Confirm deletion of this database. This operation cannot be undone!", key="confirm_delete_db")
+            if st.button("Delete Database", key="delete_db_btn"):
                 if not confirmed:
-                    st.warning("請先勾選確認刪除")
+                    st.warning("Please check the confirmation box first.")
                 else:
                     success = delete_vector_db(selected_db)
                     if success:
-                        st.success(f"✅ 資料庫 `{selected_db}` 已成功刪除！")
+                        st.success(f"✅ Database `{selected_db}` has been successfully deleted!")
                         st.session_state.last_action = "delete_db"
                         st.stop()
                     else:
-                        st.error("❌ 資料庫刪除失敗，請稍後再試。")
+                        st.error("❌ Failed to delete database, please try again later.")
     
-        # ===== 為現有資料庫新增檔案功能 =====
-        st.markdown("### ➕ 新增檔案到此資料庫")
+        # ===== Add files to existing database function =====
+        st.markdown("### ➕ Add Files to This Database")
         uploaded_files = st.file_uploader(
-            "**選擇檔案**",
+            "**Select Files**",
             type=["pdf", "ppt", "pptx", "docx", "txt", "png", "jpg", "jpeg", "mp3", "mp4"],
             accept_multiple_files=True,
             key="add_files"
         )
 
-        # 按下按鈕後，將檔案新增到對應資料庫，並重建向量資料庫
-        if st.button("🚀 新增並重建向量資料庫", key="upload_new_files"):
+        # Rebuild vector database with added files
+        if st.button("🚀 Add and Rebuild Vector Database", key="upload_new_files"):
             if not uploaded_files:
-                st.warning("請先上傳檔案")
+                st.warning("Please upload files first.")
             else:
-                with st.spinner("正在重建向量資料庫"):
+                with st.spinner("Rebuilding vector database..."):
                     count = rebuild_vector_db(selected_db, chunk_overlap, uploaded_files)
-                st.success(f"✅ 建立完成，共 {count} 個chunk")
+                st.success(f"✅ Build complete, {count} chunks in total.")
                 st.session_state.last_action = "add"
                 st.stop()
-    
