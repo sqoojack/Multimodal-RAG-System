@@ -24,7 +24,7 @@ with col_left:
     # Upload files to create a new database
     uploaded_files = st.file_uploader(
         "**Upload PDF, Word, PPT, Media, Text or Image files**",
-        type=["pdf", "ppt", "pptx", "docx", "txt", "png", "jpg", "jpeg", "mp3", "mp4"],
+        type=["py", "c", "cpp", "pdf", "ppt", "pptx", "docx", "txt", "png", "jpg", "jpeg", "mp3", "mp4"],
         accept_multiple_files=True,
         key="new_db_files"
     )

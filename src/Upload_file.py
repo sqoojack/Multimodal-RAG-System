@@ -1,4 +1,3 @@
-
 # Upload_file.py
 from utils import io, pytesseract, base64, requests, re, json, ffmpeg, tempfile, os, whisper
 from langchain_core.documents import Document
@@ -8,22 +7,22 @@ from PyPDF2 import PdfReader
 from PIL import Image, ImageFile
 from config import ollama_url
 
-# 使用多模態模型去產生圖片描述並回傳 (ex: LLaVA), ollama_url: Ollama的API位置
+# Generate image description using multimodal LLM (e.g. LLaVA)
 def get_image_caption(image_bytes, ollama_url, img_model):
-    # 將圖片轉成 base64 編碼格式，符合 Ollama 接口格式
+    # Convert image to base64 format for Ollama API
     b64_image = base64.b64encode(image_bytes).decode()
 
-    # 建立 POST 請求內容，傳入 prompt 與圖片（以 base64 格式）
+    # Create POST request payload
     payload = {
         "model": img_model,
-        "prompt": "請描述這張圖片的內容，讓視障者可以理解。",
+        "prompt": "Please describe the content of this image to help visually impaired individuals understand it.",
         "images": [b64_image]
     }
 
-    # 發送請求給 Ollama，取得LLM對於prompt以及圖像所生成的回應, json=payload: 自動把 payload 轉成 JSON 字串, 因為這是Ollama API所預期的輸入格式
+    # Send request to Ollama API
     response = requests.post(f"{ollama_url}/api/generate", json=payload)
 
-    # 將生成的回應拼接成包含多個json結構的字串
+    # Combine response lines into a single string
     result = ""
     for line in response.iter_lines():
         if line:
@@ -31,61 +30,60 @@ def get_image_caption(image_bytes, ollama_url, img_model):
 
     responses = []
 
-    # 使用正則表達式擷取所有 JSON 格式的字串片段
+    # Extract JSON objects using regex
     json_objects = re.findall(r'\{.*?"response":.*?\}', result)
 
-    # 嘗試逐一解析 JSON 片段，並提取 "response" 欄位內容
+    # Parse JSON objects and extract response field
     for obj in json_objects:
         try:
             data = json.loads(obj)
             if "response" in data:
                 responses.append(data["response"])
         except json.JSONDecodeError:
-            continue  # 忽略格式錯誤的片段
+            continue  # Ignore invalid JSON segments
 
-    # 將所有回傳的片段組合成一段完整圖像描述
+    # Return combined image description
     return "".join(responses).strip()
 
-# 載入上傳的檔案，並轉為 Langchain 的 Document 格式, uploaded_file: user上傳的檔案
-
+# Load uploaded file and convert to Langchain Document format
 def load_documents_from_upload(uploaded_file, img_model):
 
-    # 取得檔案名稱與內容
+    # Get filename and content
     filename = uploaded_file.name.lower()
     content = uploaded_file.read()
 
-    # === 處理 PDF 檔 ===
+    # === Handle PDF files ===
     if filename.endswith(".pdf"):
-        reader = PdfReader(io.BytesIO(content))  # 用 BytesIO 讀取二進位內容
+        reader = PdfReader(io.BytesIO(content))  # Read binary content
         docs = []
         for idx, page in enumerate(reader.pages):
             text = page.extract_text() or ""
-            if text.strip():  # 若該頁有文字才加入
+            if text.strip():  # Only add pages with text
                 docs.append(Document(
                     page_content=text.strip(),
                     metadata={
                         "source": uploaded_file.name,
                         "type": "pdf",
-                        "page": idx + 1  # 從 1 開始標記頁碼
+                        "page": idx + 1  # 1-based page index
                     }
                 ))
         return docs
 
-    # === 處理圖檔（jpg, png, jpeg）===
+    # === Handle image files (jpg, jpeg, png) ===
     elif filename.endswith((".jpg", ".jpeg", ".png")):
-        ImageFile.LOAD_TRUNCATED_IMAGES = True  # 允許載入不完整圖片
-        image = Image.open(io.BytesIO(content)).convert("RGB")  # 開啟圖片並轉為 RGB 模式
+        ImageFile.LOAD_TRUNCATED_IMAGES = True  # Allow loading truncated images
+        image = Image.open(io.BytesIO(content)).convert("RGB")  # Convert to RGB mode
 
-        # 使用 Tesseract 執行 OCR（中文＋英文）
+        # Perform OCR using Tesseract (Traditional Chinese + English)
         ocr_text = pytesseract.image_to_string(image, lang="chi_tra+eng")
         ocr_lines = [l.strip() for l in ocr_text.splitlines() if l.strip()]
         ocr_paragraph = "\n".join(ocr_lines)
 
-        # 使用圖像模型（如 LLaVA）取得圖片描述
-        caption = get_image_caption(content, ollama_url, img_model) or "(無回應)"
+        # Get image caption from LLM
+        caption = get_image_caption(content, ollama_url, img_model) or "(No response)"
 
-        # 組合 OCR + 圖說為完整內容
-        full_text = f"""【圖像描述】\n{caption}\n\n【圖片內文字 (OCR)】\n{ocr_paragraph}"""
+        # Combine caption and OCR text
+        full_text = f"""【Image Description】\n{caption}\n\n【OCR Text】\n{ocr_paragraph}"""
 
         return [
             Document(
@@ -97,6 +95,7 @@ def load_documents_from_upload(uploaded_file, img_model):
             )
         ]
     
+    # === Handle DOCX files ===
     elif filename.endswith(".docx"):
         text = ""
         doc = DocxDocument(io.BytesIO(content))
@@ -106,15 +105,15 @@ def load_documents_from_upload(uploaded_file, img_model):
         return [Document(page_content=text.strip(),
                     metadata={"source": uploaded_file.name, "type": "doc"})]
     
-    # 目前不支援doc舊檔案
+    # === Handle legacy DOC files ===
     elif filename.endswith(".doc"):   
-        # 1. 寫入臨時檔案
+        # 1. Write to temporary file
         with tempfile.TemporaryDirectory() as tmp:
             path_doc = os.path.join(tmp, "input.doc")
             with open(path_doc, "wb") as f:
                 f.write(content)
 
-            # 2. 啟動 Word COM 讀取文字
+            # 2. Read text via Word COM automation
             word = client.Dispatch("Word.Application")
             word.Visible = False
             doc  = word.Documents.Open(path_doc, ReadOnly=True)
@@ -122,13 +121,13 @@ def load_documents_from_upload(uploaded_file, img_model):
             doc.Close(False)
             word.Quit()
 
-        # 3. 回傳 LangChain Document
+        # 3. Return LangChain Document
         return [
             Document(
                 page_content=text.strip(),
                 metadata={"source": uploaded_file.name, "type": "doc"})]
     
-    # 處理ppt檔
+    # === Handle PPTX and PPT files ===
     elif filename.endswith((".pptx", ".ppt")):
         prs = Presentation(io.BytesIO(content))
         text = ""
@@ -141,25 +140,26 @@ def load_documents_from_upload(uploaded_file, img_model):
         return [Document(page_content=text.strip(),
                         metadata={"source": uploaded_file.name, "type": "ppt"})]
     
+    # === Handle MP3 files ===
     elif filename.endswith(".mp3"):
         with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
             tmp.write(content)
             tmp_path = tmp.name
         whisper_model = whisper.load_model("base")
-        result = whisper_model.transcribe(tmp_path)    # 用 Whisper 做轉錄
+        result = whisper_model.transcribe(tmp_path)    # Transcribe audio using Whisper
         transcript = result["text"].strip()
         
         return [Document(page_content=transcript, metadata={"source": uploaded_file.name, "type": "audio"})]
 
-    # 處理 mp4 (先只抽音訊, 把他轉成mp3後採用跟mp3一樣的處理方式) 要下載ffmpeg才能轉檔, 目前公司會擋所以暫時無法用mp4
+    # === Handle MP4 files ===
     elif filename.endswith(".mp4"):
-        # 1. 創建一個暫存的 MP4 檔案
+        # 1. Create a temporary MP4 file
         with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp:
-            tmp.write(content) # 將上傳的 mp4 bytes 寫入檔案
+            tmp.write(content) # Write uploaded bytes to file
             tmp_path = tmp.name
         
         try:
-            # 2. 直接讓 Whisper 讀取該 MP4 路徑 (Whisper 會自己處理音訊抽取)
+            # 2. Transcribe directly using Whisper
             whisper_model = whisper.load_model("base")
             result = whisper_model.transcribe(tmp_path)
             transcript = result["text"].strip()
@@ -171,18 +171,36 @@ def load_documents_from_upload(uploaded_file, img_model):
             raise e
         
         finally:
-            # 3. 記得刪除暫存檔
+            # 3. Remove temporary file
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
 
-    # === 處理純文字檔 .txt===
+    # === Handle source code files (.py, .c, .cpp) ===
+    elif filename.endswith((".py", ".c", ".cpp")):
+        try:
+            text = content.decode("utf-8")
+        except UnicodeDecodeError:
+            text = content.decode("big5", errors="ignore")
+
+        # Keep original spacing and line breaks for source code
+        return [
+            Document(
+                page_content=text,
+                metadata={
+                    "source": uploaded_file.name,
+                    "type": "code"
+                }
+            )
+        ]
+
+    # === Handle plain text files (.txt) ===
     else:
         try:
-            text = content.decode("utf-8")         # 使用 UTF-8 解碼
+            text = content.decode("utf-8")         # Decode using UTF-8
         except UnicodeDecodeError:
-            text = content.decode("big5", errors="ignore")      # 若無法解碼，改用 Big5（台灣常見編碼）
+            text = content.decode("big5", errors="ignore")      # Fallback to Big5
 
-        # 移除空白行並重組內容
+        # Remove empty lines and reconstruct text
         full_text = "\n".join([l.strip() for l in text.splitlines() if l.strip()])
 
         return [
@@ -196,9 +214,9 @@ def load_documents_from_upload(uploaded_file, img_model):
         ]
 
 
-# 處理多個檔案，並呼叫 load_documents_from_upload
+# Process multiple files and aggregate LangChain documents
 def process_uploaded_files(uploaded_files, img_model):
     docs = []
     for f in uploaded_files or []:
-        docs.extend(load_documents_from_upload(f, img_model))   # 逐一加入目前的docs中
+        docs.extend(load_documents_from_upload(f, img_model))   # Append documents sequentially
     return docs
